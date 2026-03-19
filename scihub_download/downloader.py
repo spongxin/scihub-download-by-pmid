@@ -10,6 +10,8 @@ import fitz
 import pandas as pd
 from tqdm import tqdm
 
+from scihub_download.source_manager import SourceManager
+
 # ------------------- 配置 -------------------
 DEFAULT_SCI_HUB_SOURCES = [
     "https://sci-hub.se",
@@ -86,6 +88,7 @@ def download_worker(row, save_dir: str, sources: List[str]) -> bool:
 
             match = re.search(r'(?:iframe|embed).*?src="([^"]+\.pdf)', resp.text)
             if not match:
+                logging.debug(f"No PDF found at {url_to_fetch}, trying next source...")
                 continue
 
             pdf_url = match.group(1)
@@ -99,7 +102,9 @@ def download_worker(row, save_dir: str, sources: List[str]) -> bool:
                     return True
                 else:
                     os.remove(filepath)
-        except Exception:
+                    logging.debug(f"Invalid PDF from {pdf_url}, trying next source...")
+        except Exception as e:
+            logging.debug(f"Source {base_url} failed: {e}, trying next source...")
             continue
     return False
 
@@ -110,13 +115,27 @@ def main():
     parser.add_argument("save_dir", help="PDF 保存目录")
     parser.add_argument("--failed_csv", default=None, help="下载失败记录 CSV 文件路径（可指定目录和名称）")
     parser.add_argument("-w", "--workers", type=int, default=5, help="并行线程数")
-    parser.add_argument("-s", "--sources", nargs='+', default=DEFAULT_SCI_HUB_SOURCES, help="Sci-Hub 源列表")
+    parser.add_argument("-s", "--sources", nargs='+', default=None, help="Sci-Hub 源列表（默认自动获取最佳源）")
+    parser.add_argument("--no-auto-sources", action='store_true', help="禁用自动源获取，使用默认源")
+    parser.add_argument("--refresh-sources", action='store_true', help="强制刷新源缓存")
     parser.add_argument("--delete-corrupted", action='store_true', help="删除损坏文件后重下载")
     parser.add_argument("-l", "--log_file", default="download_log.txt", help="日志文件")
     args = parser.parse_args()
 
     setup_logging(args.log_file)
     os.makedirs(args.save_dir, exist_ok=True)
+
+    # --- 初始化源 ---
+    if args.no_auto_sources or args.sources:
+        sources = args.sources if args.sources else DEFAULT_SCI_HUB_SOURCES
+    else:
+        source_manager = SourceManager()
+        try:
+            sources = source_manager.get_best_sources(n=3, force_refresh=args.refresh_sources)
+            logging.info(f"Using {len(sources)} sources: {sources}")
+        except Exception as e:
+            logging.warning(f"Failed to get best sources: {e}, using defaults")
+            sources = DEFAULT_SCI_HUB_SOURCES
 
     # --- 读取 CSV ---
     try:
