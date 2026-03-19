@@ -1,8 +1,11 @@
+README.md
 pyproject.toml
 scihub_download/__init__.py
 scihub_download/__main__.py
 scihub_download/cli.py
+scihub_download/downloader.py
 scihub_download/input_parser.py
+scihub_download/source_manager.py
 scihub_download.egg-info/PKG-INFO
 scihub_download.egg-info/SOURCES.txt
 scihub_download.egg-info/dependency_links.txt
@@ -10,4 +13,7 @@ scihub_download.egg-info/entry_points.txt
 scihub_download.egg-info/requires.txt
 scihub_download.egg-info/top_level.txt
 tests/test_cli.py
+tests/test_downloader.py
 tests/test_input_parser.py
+tests/test_integration.py
+tests/test_source_manager.py

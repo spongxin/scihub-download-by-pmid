@@ -49,10 +49,17 @@ def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
 
+    # Print Sci-Hub coverage message (not in quiet mode) - at the very beginning
+    if not args.quiet:
+        print("Sci-Hub 对 2022 年之前在主要学术出版物上发表的所有论文的覆盖率超过 90%。较新的文章可以在新平台 Sci-Net")
+        print("(https://sci-net.xyz/) 上请求获取，这是一个研究人员互助社交网络：您可以发布请求，其他成员会帮助解决。全文通常在几分钟内就会被上传，除了一些特殊情况。一旦上传，论")
+        print("文将对所有人免费开放，无需注册。您也可以上传自己的论文，以确保它们永久开放获取。")
+        print()
+        sys.stdout.flush()  # Ensure message is printed before any logging
+
     # Parse input - convert to CSV for downloader
     if args.file:
         csv_file = args.file
-        print(f"Loaded {args.file}")
     else:  # args.id - create temp CSV
         import pandas as pd
         import tempfile
@@ -61,7 +68,8 @@ def main() -> None:
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
         df.to_csv(temp_file.name, index=False)
         csv_file = temp_file.name
-        print(f"Processing single ID: {args.id}")
+        if not args.quiet:
+            print(f"Processing single ID: {args.id}")
 
     # Build argument list for downloader
     downloader_args = ['', csv_file, args.output,
@@ -70,6 +78,8 @@ def main() -> None:
                        '--delete-corrupted']
     if args.verbose:
         downloader_args.append('--verbose')
+    elif args.quiet:
+        downloader_args.append('--quiet')
 
     # Call downloader main with modified argv
     sys.argv = downloader_args

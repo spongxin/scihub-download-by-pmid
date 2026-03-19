@@ -147,7 +147,8 @@ def download_worker(row, save_dir: str, sources: List[str], filename_pattern: st
         error_type = download_single_source(doi, source_url, filepath)
 
         if error_type == DownloadErrorType.SUCCESS:
-            logging.info(f"[SUCCESS] {pmid}")
+            if logging.getLogger().level <= logging.INFO:
+                logging.info(f"[SUCCESS] {pmid}")
             return True
 
         elif error_type == DownloadErrorType.NOT_FOUND:
@@ -184,18 +185,37 @@ def main():
                         default="pmid", help="Filename pattern (default: pmid)")
     parser.add_argument("-l", "--log_file", default="download_log.txt", help="日志文件")
     parser.add_argument("--verbose", action="store_true", help="Enable detailed output")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress non-essential output")
     args = parser.parse_args()
 
     # Setup logging with verbose support
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(args.log_file, mode='w', encoding='utf-8'),
-            logging.StreamHandler()
-        ]
-    )
+    if args.quiet:
+        # Quiet mode: only log to file, not console
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(args.log_file, mode='w', encoding='utf-8'),
+            ]
+        )
+    elif args.verbose:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(args.log_file, mode='w', encoding='utf-8'),
+                logging.StreamHandler()
+            ]
+        )
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(args.log_file, mode='w', encoding='utf-8'),
+                logging.StreamHandler()
+            ]
+        )
     os.makedirs(args.save_dir, exist_ok=True)
 
     # --- 初始化源 ---
@@ -233,6 +253,7 @@ def main():
     # --- 预检查已存在文件 ---
     # Use same pattern as download_worker for consistency
     df_to_download = []
+    exists_count = 0
     for _, row in df.iterrows():
         # Use same pattern as download_worker
         identifier = row['PMID'] if args.format == "pmid" else row['DOI']
@@ -248,23 +269,31 @@ def main():
                     logging.info(f"[SKIP] {row['PMID']}，损坏文件未删除")
             else:
                 logging.info(f"[EXISTS] {row['PMID']}")
+                exists_count += 1
         else:
             df_to_download.append(row)
 
     if not df_to_download:
         logging.info("所有文件已存在且有效，无需下载")
+        if args.quiet:
+            print(f"任务完成: 共 {len(df)} 条记录, 全部已存在")
         return
 
     # --- 并行下载 ---
     failed_records = []
+    success_count = 0
+    # Disable tqdm progress bar in quiet mode
+    disable_tqdm = args.quiet
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {executor.submit(download_worker, row, args.save_dir, sources, args.format): row for row in df_to_download}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="下载 PDF", ncols=100):
+        for future in tqdm(as_completed(futures), total=len(futures), desc="下载 PDF", ncols=100, disable=disable_tqdm):
             row = futures[future]
             try:
                 success = future.result()
                 if success:
-                    logging.info(f"[SUCCESS] {row['PMID']}")
+                    success_count += 1
+                    if not args.quiet:
+                        logging.info(f"[SUCCESS] {row['PMID']}")
                 else:
                     logging.warning(f"[FAILED] {row['PMID']}")
                     failed_records.append({'PMID': row['PMID'], 'DOI': row['DOI']})
@@ -279,6 +308,17 @@ def main():
         os.makedirs(os.path.dirname(failed_csv_path), exist_ok=True)
         failed_df.to_csv(failed_csv_path, index=False)
         logging.info(f"未成功下载 {len(failed_records)} 条记录，已保存到 {failed_csv_path}")
+
+    # --- Quiet mode summary report ---
+    if args.quiet:
+        total_in_csv = len(df)
+        print(f"任务完成: 共 {total_in_csv} 条记录")
+        if exists_count > 0:
+            print(f"  已存在: {exists_count}")
+        if len(df_to_download) > 0:
+            print(f"  新下载: 成功 {success_count}, 失败 {len(failed_records)}")
+        if failed_records:
+            print(f"  失败记录已保存到: {args.failed_csv or os.path.join(args.save_dir, 'failed_records.csv')}")
 
 if __name__ == "__main__":
     main()
