@@ -282,11 +282,10 @@ def main():
     # --- 并行下载 ---
     failed_records = []
     success_count = 0
-    # Disable tqdm progress bar in quiet mode
-    disable_tqdm = args.quiet
+    # Progress bar always shown (quiet mode only suppresses logs, not progress)
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {executor.submit(download_worker, row, args.save_dir, sources, args.format): row for row in df_to_download}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="下载 PDF", ncols=100, disable=disable_tqdm):
+        for future in tqdm(as_completed(futures), total=len(futures), desc="下载 PDF", ncols=100):
             row = futures[future]
             try:
                 success = future.result()
