@@ -36,17 +36,6 @@ REQUESTS_SESSION.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 })
 
-# ------------------- 日志 -------------------
-def setup_logging(log_file: str):
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file, mode='w', encoding='utf-8'),
-            logging.StreamHandler()
-        ]
-    )
-
 # ------------------- 工具函数 -------------------
 def clean_filename(identifier: str, pattern: str = "pmid") -> str:
     """Create filename based on pattern choice.
@@ -194,9 +183,19 @@ def main():
     parser.add_argument("--format", type=str, choices=["pmid", "doi", "original"],
                         default="pmid", help="Filename pattern (default: pmid)")
     parser.add_argument("-l", "--log_file", default="download_log.txt", help="日志文件")
+    parser.add_argument("--verbose", action="store_true", help="Enable detailed output")
     args = parser.parse_args()
 
-    setup_logging(args.log_file)
+    # Setup logging with verbose support
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(args.log_file, mode='w', encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
     os.makedirs(args.save_dir, exist_ok=True)
 
     # --- 初始化源 ---
