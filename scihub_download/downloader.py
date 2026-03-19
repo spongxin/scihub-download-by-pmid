@@ -48,9 +48,21 @@ def setup_logging(log_file: str):
     )
 
 # ------------------- 工具函数 -------------------
-def clean_filename(pmid: str) -> str:
-    """用 PMID 创建合法文件名"""
-    return re.sub(r'[\\/*?:"<>|]', '_', pmid) + ".pdf"
+def clean_filename(identifier: str, pattern: str = "pmid") -> str:
+    """Create filename based on pattern choice.
+
+    Args:
+        identifier: PMID or DOI to use in filename
+        pattern: "pmid", "doi", or "original"
+
+    Returns:
+        Sanitized filename with .pdf extension
+    """
+    if pattern == "original":
+        # Use identifier as-is (for metadata-based names)
+        return identifier
+    # Sanitize and append .pdf
+    return re.sub(r'[\\/*?:"<>|]', '_', identifier) + ".pdf"
 
 def is_pdf_valid(filepath: str) -> bool:
     """检查 PDF 是否有效"""
