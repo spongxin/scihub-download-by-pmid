@@ -232,9 +232,13 @@ def main():
         return
 
     # --- 预检查已存在文件 ---
+    # Use same pattern as download_worker for consistency
     df_to_download = []
     for _, row in df.iterrows():
-        filepath = os.path.join(args.save_dir, clean_filename(row['PMID']))
+        # Use same pattern as download_worker
+        identifier = row['PMID'] if args.format == "pmid" else row['DOI']
+        filename = clean_filename(identifier, args.format)
+        filepath = os.path.join(args.save_dir, filename)
         if os.path.exists(filepath):
             if not is_pdf_valid(filepath):
                 logging.warning(f"[CORRUPTED] {row['PMID']}")
