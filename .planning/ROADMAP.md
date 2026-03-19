@@ -29,7 +29,7 @@
 Plans:
 - [x] 01-PLAN-00.md - Test infrastructure setup (pytest, fixtures, test stubs)
 - [x] 01-PLAN-01.md - Input parser module (CSV, TXT, Excel, single ID)
-- [ ] 01-PLAN-02.md - CLI argument parser (all flags CLI-01 to CLI-06)
+- [x] 01-PLAN-02.md - CLI argument parser (all flags CLI-01 to CLI-06)
 - [ ] 01-PLAN-03.md - Integration and entry point
 
 ### Phase 2: Source Management
