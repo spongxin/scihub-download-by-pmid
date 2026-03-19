@@ -65,15 +65,21 @@ def is_pdf_valid(filepath: str) -> bool:
     except Exception:
         return False
 
-def download_single_source(doi: str, source_url: str, filepath: str) -> DownloadErrorType:
-    """Attempt download from a single source. Returns error type."""
+def download_single_source(identifier: str, source_url: str, filepath: str) -> DownloadErrorType:
+    """Attempt download from a single source. Returns error type.
+
+    Args:
+        identifier: DOI or PMID to download
+        source_url: Sci-Hub source URL
+        filepath: Local filepath to save PDF
+    """
     try:
-        url_to_fetch = f"{source_url.rstrip('/')}/{doi}"
+        url_to_fetch = f"{source_url.rstrip('/')}/{identifier}"
         resp = REQUESTS_SESSION.get(url_to_fetch, timeout=90)
 
         # Check for 404 before raising
         if resp.status_code == 404:
-            logging.debug(f"404 from {source_url} for {doi}")
+            logging.debug(f"404 from {source_url} for {identifier}")
             return DownloadErrorType.NOT_FOUND
 
         resp.raise_for_status()
@@ -81,7 +87,7 @@ def download_single_source(doi: str, source_url: str, filepath: str) -> Download
         # Extract PDF URL
         match = re.search(r'(?:iframe|embed).*?src="([^"]+\.pdf)', resp.text)
         if not match:
-            logging.debug(f"No PDF embed found at {source_url} for {doi}")
+            logging.debug(f"No PDF embed found at {source_url} for {identifier}")
             return DownloadErrorType.NOT_FOUND
 
         pdf_url = match.group(1)
@@ -104,10 +110,10 @@ def download_single_source(doi: str, source_url: str, filepath: str) -> Download
         return DownloadErrorType.SUCCESS
 
     except requests.exceptions.Timeout:
-        logging.debug(f"Timeout from {source_url}: {doi}")
+        logging.debug(f"Timeout from {source_url}: {identifier}")
         return DownloadErrorType.NETWORK_ERROR
     except requests.exceptions.ConnectionError:
-        logging.debug(f"Connection error from {source_url}: {doi}")
+        logging.debug(f"Connection error from {source_url}: {identifier}")
         return DownloadErrorType.NETWORK_ERROR
     except requests.exceptions.HTTPError as e:
         logging.debug(f"HTTP error from {source_url}: {e}")
@@ -135,48 +141,55 @@ def download_file(url: str, filepath: str) -> bool:
 
 # ------------------- 下载 Worker -------------------
 def download_worker(row, save_dir: str, sources: List[str], filename_pattern: str = "pmid") -> bool:
-    """Download a single DOI's PDF with smart retry based on error type."""
+    """Download a single PDF with smart retry based on error type.
+
+    Uses DOI if available, otherwise falls back to PMID.
+    """
     doi = row['DOI']
     pmid = row['PMID']
 
-    # Skip if no DOI available (Sci-Hub requires DOI)
-    if not doi or (isinstance(doi, float) and pd.isna(doi)) or (isinstance(doi, str) and doi.strip() == ''):
-        logging.warning(f"[SKIP] {pmid} | No DOI available - Sci-Hub requires DOI for download")
+    # Determine identifier for download: prefer DOI, fallback to PMID
+    if doi and not (isinstance(doi, float) and pd.isna(doi)) and not (isinstance(doi, str) and doi.strip() == ''):
+        download_id = doi
+    elif pmid and not (isinstance(pmid, float) and pd.isna(pmid)) and not (isinstance(pmid, str) and pmid.strip() == ''):
+        download_id = pmid
+    else:
+        logging.warning(f"[SKIP] No valid identifier available")
         return False
 
     # Use the specified filename pattern (pmid, doi, or original)
-    identifier = pmid if filename_pattern == "pmid" else doi
-    # Fallback to DOI if PMID is missing
-    if filename_pattern == "pmid" and (not identifier or identifier == 'nan'):
-        identifier = doi
+    if filename_pattern == "pmid":
+        identifier = pmid if pmid and pmid != 'nan' else download_id
+    else:
+        identifier = download_id
     filename = clean_filename(identifier, filename_pattern)
     filepath = os.path.join(save_dir, filename)
 
     for source_url in sources:
-        error_type = download_single_source(doi, source_url, filepath)
+        error_type = download_single_source(download_id, source_url, filepath)
 
         if error_type == DownloadErrorType.SUCCESS:
             if logging.getLogger().level <= logging.INFO:
-                logging.info(f"[SUCCESS] {pmid}")
+                logging.info(f"[SUCCESS] {identifier}")
             return True
 
         elif error_type == DownloadErrorType.NOT_FOUND:
             # Skip to next source immediately - permanent failure
-            logging.debug(f"404 from {source_url}, trying next source for {pmid}")
+            logging.debug(f"404 from {source_url}, trying next source for {identifier}")
             continue
 
         elif error_type == DownloadErrorType.NETWORK_ERROR:
             # Try next source on network error
-            logging.debug(f"Network error from {source_url}, trying next source for {pmid}")
+            logging.debug(f"Network error from {source_url}, trying next source for {identifier}")
             continue
 
         elif error_type == DownloadErrorType.VALIDATION_FAILED:
             # Try next source on validation failure
-            logging.debug(f"Validation failed from {source_url}, trying next source for {pmid}")
+            logging.debug(f"Validation failed from {source_url}, trying next source for {identifier}")
             continue
 
     # All sources exhausted - log failure with details
-    logging.warning(f"[FAILED] {pmid} | DOI: {doi} | All {len(sources)} sources failed")
+    logging.warning(f"[FAILED] {identifier} | All {len(sources)} sources failed")
     return False
 
 # ------------------- 主函数 -------------------
@@ -275,31 +288,34 @@ def main():
     # Use same pattern as download_worker for consistency
     df_to_download = []
     exists_count = 0
-    no_doi_count = 0  # Count records without DOI
     for _, row in df.iterrows():
-        # Skip records without DOI (cannot download via Sci-Hub)
-        if not row['DOI'] or (isinstance(row['DOI'], str) and row['DOI'].strip() == ''):
-            no_doi_count += 1
-            logging.warning(f"[SKIP] {row['PMID'] or row['DOI']} | No DOI available")
-            continue
+        # Determine download identifier: prefer DOI, fallback to PMID
+        doi = row['DOI']
+        pmid = row['PMID']
+        if doi and not (isinstance(doi, str) and doi.strip() == ''):
+            download_id = doi
+        elif pmid and not (isinstance(pmid, str) and pmid.strip() == ''):
+            download_id = pmid
+        else:
+            continue  # Skip records with no valid identifier
 
-        # Use same pattern as download_worker
-        identifier = row['PMID'] if args.format == "pmid" else row['DOI']
-        # Fallback to DOI if PMID is missing
-        if args.format == "pmid" and (not identifier or identifier == 'nan'):
-            identifier = row['DOI']
+        # Determine filename identifier
+        if args.format == "pmid":
+            identifier = pmid if pmid and pmid != 'nan' else download_id
+        else:
+            identifier = download_id
         filename = clean_filename(identifier, args.format)
         filepath = os.path.join(args.save_dir, filename)
         if os.path.exists(filepath):
             if not is_pdf_valid(filepath):
-                logging.warning(f"[CORRUPTED] {row['PMID'] or row['DOI']}")
+                logging.warning(f"[CORRUPTED] {identifier}")
                 if args.delete_corrupted:
                     os.remove(filepath)
                     df_to_download.append(row)
                 else:
-                    logging.info(f"[SKIP] {row['PMID'] or row['DOI']}，损坏文件未删除")
+                    logging.info(f"[SKIP] {identifier}，损坏文件未删除")
             else:
-                logging.info(f"[EXISTS] {row['PMID'] or row['DOI']}")
+                logging.info(f"[EXISTS] {identifier}")
                 exists_count += 1
         else:
             df_to_download.append(row)
