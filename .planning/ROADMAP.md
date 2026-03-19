@@ -69,7 +69,10 @@ Plans:
 2. User can choose filename pattern (PMID, DOI, or custom)
 3. System skips already downloaded valid files (no redownload)
 4. System detects corrupted existing files and re-downloads them
-**Plans:** TBD
+**Plans:** 1/1 plans
+
+Plans:
+- [x] 04-01-PLAN.md - Connect CLI --format to downloader, implement filename patterns
 
 ### Phase 5: Reporting
 **Goal:** Users have clear visibility into download results
@@ -88,7 +91,7 @@ Plans:
 | 1. Foundation | 4/4 | Complete | 2026-03-19 |
 | 2. Source Management | 1/1 | Complete | 2026-03-19 |
 | 3. Download Engine | 1/1 | Complete | 2026-03-19 |
-| 4. File Output | 0/1 | Not started | - |
+| 4. File Output | 1/1 | Complete | 2026-03-19 |
 | 5. Reporting | 0/1 | Not started | - |
 
 ## Coverage
@@ -111,3 +114,5 @@ Plans:
 *Phase 2 executed: 2026-03-19*
 *Phase 3 planned: 2026-03-19*
 *Phase 3 Plan 01 executed: 2026-03-19*
+*Phase 4 planned: 2026-03-19*
+*Phase 4 Plan 01 executed: 2026-03-19*
