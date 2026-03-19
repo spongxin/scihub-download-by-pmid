@@ -2,6 +2,7 @@ import os
 import re
 import argparse
 import logging
+from enum import Enum
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
@@ -11,6 +12,14 @@ import pandas as pd
 from tqdm import tqdm
 
 from scihub_download.source_manager import SourceManager
+
+# ------------------- Error Classification -------------------
+class DownloadErrorType(Enum):
+    """Error types for smart retry decisions."""
+    NOT_FOUND = "404"           # Skip immediately, no retry
+    NETWORK_ERROR = "network"   # Try next source
+    VALIDATION_FAILED = "validation"  # Try next source
+    SUCCESS = "success"         # Download succeeded
 
 # ------------------- 配置 -------------------
 DEFAULT_SCI_HUB_SOURCES = [
@@ -55,6 +64,57 @@ def is_pdf_valid(filepath: str) -> bool:
     except Exception:
         return False
 
+def download_single_source(doi: str, source_url: str, filepath: str) -> DownloadErrorType:
+    """Attempt download from a single source. Returns error type."""
+    try:
+        url_to_fetch = f"{source_url.rstrip('/')}/{doi}"
+        resp = REQUESTS_SESSION.get(url_to_fetch, timeout=90)
+
+        # Check for 404 before raising
+        if resp.status_code == 404:
+            logging.debug(f"404 from {source_url} for {doi}")
+            return DownloadErrorType.NOT_FOUND
+
+        resp.raise_for_status()
+
+        # Extract PDF URL
+        match = re.search(r'(?:iframe|embed).*?src="([^"]+\.pdf)', resp.text)
+        if not match:
+            logging.debug(f"No PDF embed found at {source_url} for {doi}")
+            return DownloadErrorType.NOT_FOUND
+
+        pdf_url = match.group(1)
+        if pdf_url.startswith("//"):
+            pdf_url = "https:" + pdf_url
+        elif not pdf_url.startswith("http"):
+            pdf_url = f"{source_url.rstrip('/')}/{pdf_url.lstrip('/')}"
+
+        # Download file
+        if not download_file(pdf_url, filepath):
+            logging.debug(f"Download file failed: {pdf_url}")
+            return DownloadErrorType.NETWORK_ERROR
+
+        # Validate PDF
+        if not is_pdf_valid(filepath):
+            os.remove(filepath)
+            logging.debug(f"PDF validation failed: {filepath}")
+            return DownloadErrorType.VALIDATION_FAILED
+
+        return DownloadErrorType.SUCCESS
+
+    except requests.exceptions.Timeout:
+        logging.debug(f"Timeout from {source_url}: {doi}")
+        return DownloadErrorType.NETWORK_ERROR
+    except requests.exceptions.ConnectionError:
+        logging.debug(f"Connection error from {source_url}: {doi}")
+        return DownloadErrorType.NETWORK_ERROR
+    except requests.exceptions.HTTPError as e:
+        logging.debug(f"HTTP error from {source_url}: {e}")
+        return DownloadErrorType.NETWORK_ERROR
+    except Exception as e:
+        logging.debug(f"Unexpected error from {source_url}: {e}")
+        return DownloadErrorType.NETWORK_ERROR
+
 def download_file(url: str, filepath: str) -> bool:
     """下载 PDF 文件"""
     try:
@@ -74,38 +134,36 @@ def download_file(url: str, filepath: str) -> bool:
 
 # ------------------- 下载 Worker -------------------
 def download_worker(row, save_dir: str, sources: List[str]) -> bool:
-    """下载单个 DOI 对应的 PDF"""
+    """Download a single DOI's PDF with smart retry based on error type."""
     doi = row['DOI']
     pmid = row['PMID']
     filename = clean_filename(pmid)
     filepath = os.path.join(save_dir, filename)
 
-    for base_url in sources:
-        try:
-            url_to_fetch = f"{base_url.rstrip('/')}/{doi}"
-            resp = REQUESTS_SESSION.get(url_to_fetch, timeout=90)
-            resp.raise_for_status()
+    for source_url in sources:
+        error_type = download_single_source(doi, source_url, filepath)
 
-            match = re.search(r'(?:iframe|embed).*?src="([^"]+\.pdf)', resp.text)
-            if not match:
-                logging.debug(f"No PDF found at {url_to_fetch}, trying next source...")
-                continue
+        if error_type == DownloadErrorType.SUCCESS:
+            logging.info(f"[SUCCESS] {pmid}")
+            return True
 
-            pdf_url = match.group(1)
-            if pdf_url.startswith("//"):
-                pdf_url = "https:" + pdf_url
-            elif not pdf_url.startswith("http"):
-                pdf_url = f"{base_url.rstrip('/')}/{pdf_url.lstrip('/')}"
-
-            if download_file(pdf_url, filepath):
-                if is_pdf_valid(filepath):
-                    return True
-                else:
-                    os.remove(filepath)
-                    logging.debug(f"Invalid PDF from {pdf_url}, trying next source...")
-        except Exception as e:
-            logging.debug(f"Source {base_url} failed: {e}, trying next source...")
+        elif error_type == DownloadErrorType.NOT_FOUND:
+            # Skip to next source immediately - permanent failure
+            logging.debug(f"404 from {source_url}, trying next source for {pmid}")
             continue
+
+        elif error_type == DownloadErrorType.NETWORK_ERROR:
+            # Try next source on network error
+            logging.debug(f"Network error from {source_url}, trying next source for {pmid}")
+            continue
+
+        elif error_type == DownloadErrorType.VALIDATION_FAILED:
+            # Try next source on validation failure
+            logging.debug(f"Validation failed from {source_url}, trying next source for {pmid}")
+            continue
+
+    # All sources exhausted - log failure with details
+    logging.warning(f"[FAILED] {pmid} | DOI: {doi} | All {len(sources)} sources failed")
     return False
 
 # ------------------- 主函数 -------------------
@@ -181,7 +239,7 @@ def main():
     # --- 并行下载 ---
     failed_records = []
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        futures = {executor.submit(download_worker, row, args.save_dir, args.sources): row for row in df_to_download}
+        futures = {executor.submit(download_worker, row, args.save_dir, sources): row for row in df_to_download}
         for future in tqdm(as_completed(futures), total=len(futures), desc="下载 PDF", ncols=100):
             row = futures[future]
             try:

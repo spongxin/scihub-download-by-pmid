@@ -55,7 +55,10 @@ Plans:
 2. User can configure number of worker threads via --workers flag
 3. System validates downloaded PDFs are not corrupted
 4. System retries network errors up to 3 times but skips 404s immediately
-**Plans:** TBD
+**Plans:** 1/1 plans
+
+Plans:
+- [ ] 03-01-PLAN.md - Error classification and smart retry logic
 
 ### Phase 4: File Output
 **Goal:** Users have control over where and how files are saved
@@ -82,8 +85,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 4/4 | ✓ Complete | 2026-03-19 |
-| 2. Source Management | 1/1 | Complete    | 2026-03-19 |
+| 1. Foundation | 4/4 | Complete | 2026-03-19 |
+| 2. Source Management | 1/1 | Complete | 2026-03-19 |
 | 3. Download Engine | 0/1 | Not started | - |
 | 4. File Output | 0/1 | Not started | - |
 | 5. Reporting | 0/1 | Not started | - |
@@ -106,3 +109,4 @@ Plans:
 *Phase 1 planned: 2026-03-19*
 *Phase 2 planned: 2026-03-19*
 *Phase 2 executed: 2026-03-19*
+*Phase 3 planned: 2026-03-19*
