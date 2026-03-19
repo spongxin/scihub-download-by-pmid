@@ -14,10 +14,10 @@
 
 ### Source Management
 
-- [ ] **SRC-01**: System automatically fetches available SciHub sources from sci-hub.pub
-- [ ] **SRC-02**: System tests each source by attempting actual download
-- [ ] **SRC-03**: System ranks sources by response time and success rate
-- [ ] **SRC-04**: System automatically switches to next source when current fails
+- [x] **SRC-01**: System automatically fetches available SciHub sources from sci-hub.pub
+- [x] **SRC-02**: System tests each source by attempting actual download
+- [x] **SRC-03**: System ranks sources by response time and success rate
+- [x] **SRC-04**: System automatically switches to next source when current fails
 
 ### Download Engine
 
@@ -76,10 +76,10 @@
 | INPUT-02 | Phase 1 | Pending |
 | INPUT-03 | Phase 1 | Pending |
 | INPUT-04 | Phase 1 | Pending |
-| SRC-01 | Phase 2 | Pending |
-| SRC-02 | Phase 2 | Pending |
-| SRC-03 | Phase 2 | Pending |
-| SRC-04 | Phase 2 | Pending |
+| SRC-01 | Phase 2 | Complete |
+| SRC-02 | Phase 2 | Complete |
+| SRC-03 | Phase 2 | Complete |
+| SRC-04 | Phase 2 | Complete |
 | DL-01 | Phase 3 | Pending |
 | DL-02 | Phase 3 | Pending |
 | DL-03 | Phase 3 | Pending |

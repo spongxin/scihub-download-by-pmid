@@ -7,7 +7,7 @@
 ## Phases
 
 - [ ] **Phase 1: Foundation** - CLI interface and multi-format input support
-- [ ] **Phase 2: Source Management** - Dynamic SciHub source discovery and switching
+- [x] **Phase 2: Source Management** - Dynamic SciHub source discovery and switching (completed 2026-03-19)
 - [ ] **Phase 3: Download Engine** - Multi-threaded downloads with validation and retry
 - [ ] **Phase 4: File Output** - Output directory and filename control
 - [ ] **Phase 5: Reporting** - Download reports and terminal summaries
@@ -41,7 +41,7 @@ Plans:
 2. System tests each source by attempting actual download
 3. System ranks sources by response time and success rate
 4. System automatically switches to next source when current fails
-**Plans:** 1 plan in 1 wave
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md - Source Manager (scraping, testing, ranking, failover)
@@ -83,7 +83,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 4/4 | ✓ Complete | 2026-03-19 |
-| 2. Source Management | 1/1 | ✓ Complete | 2026-03-19 |
+| 2. Source Management | 1/1 | Complete    | 2026-03-19 |
 | 3. Download Engine | 0/1 | Not started | - |
 | 4. File Output | 0/1 | Not started | - |
 | 5. Reporting | 0/1 | Not started | - |
