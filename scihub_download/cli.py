@@ -2,6 +2,8 @@
 import argparse
 from typing import Optional, List
 
+from .input_parser import parse_input_file, parse_single_id
+
 
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser.
@@ -38,3 +40,27 @@ def create_parser() -> argparse.ArgumentParser:
                           help="Suppress non-essential output")
 
     return parser
+
+
+def main() -> None:
+    """Main CLI entry point."""
+    parser = create_parser()
+    args = parser.parse_args()
+
+    # Parse input
+    if args.file:
+        df = parse_input_file(args.file)
+        print(f"Loaded {len(df)} records from {args.file}")
+    else:  # args.id
+        df = parse_single_id(args.id)
+        print(f"Processing single ID: {args.id}")
+
+    # Print configuration summary
+    print(f"Output directory: {args.output}")
+    print(f"Workers: {args.workers}")
+    print(f"Format: {args.format}")
+    print(f"Verbose: {args.verbose}")
+    print(f"Quiet: {args.quiet}")
+
+    # Placeholder for Phase 3 download logic
+    print(f"\nFound {len(df)} records to process.")

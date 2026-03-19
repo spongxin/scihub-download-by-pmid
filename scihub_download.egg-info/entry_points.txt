@@ -1,0 +1,2 @@
+[console_scripts]
+scihub-download = scihub_download.cli:main

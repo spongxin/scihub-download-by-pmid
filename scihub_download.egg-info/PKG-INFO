@@ -1,0 +1,25 @@
+Metadata-Version: 2.4
+Name: scihub-download
+Version: 0.1.0
+Summary: Download PDFs from Sci-Hub using PMID/DOI identifiers
+Author: Developer
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: requests>=2.0.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: pymupdf>=1.20.0
+Requires-Dist: tqdm>=4.0.0
+Requires-Dist: openpyxl>=3.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0.0; extra == "dev"
