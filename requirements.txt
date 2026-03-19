@@ -1,6 +1,8 @@
 # Core dependencies
 requests>=2.31.0
 tqdm>=4.66.0
+beautifulsoup4>=4.9.0
+lxml>=4.9.0
 
 # PDF processing
 pymupdf>=1.23.0
