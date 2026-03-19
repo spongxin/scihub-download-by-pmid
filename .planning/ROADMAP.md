@@ -27,7 +27,7 @@
 **Plans:** 4 plans in 3 waves
 
 Plans:
-- [ ] 01-PLAN-00.md - Test infrastructure setup (pytest, fixtures, test stubs)
+- [x] 01-PLAN-00.md - Test infrastructure setup (pytest, fixtures, test stubs)
 - [ ] 01-PLAN-01.md - Input parser module (CSV, TXT, Excel, single ID)
 - [ ] 01-PLAN-02.md - CLI argument parser (all flags CLI-01 to CLI-06)
 - [ ] 01-PLAN-03.md - Integration and entry point
@@ -79,7 +79,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/4 | Planning complete | - |
+| 1. Foundation | 1/4 | Wave 0 complete | 2026-03-19 |
 | 2. Source Management | 0/1 | Not started | - |
 | 3. Download Engine | 0/1 | Not started | - |
 | 4. File Output | 0/1 | Not started | - |
