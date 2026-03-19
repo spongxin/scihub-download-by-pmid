@@ -122,7 +122,7 @@ def download_file(url: str, filepath: str) -> bool:
         with REQUESTS_SESSION.get(url, stream=True, timeout=120) as resp:
             resp.raise_for_status()
             total_size = int(resp.headers.get('content-length', 0))
-            if total_size > 0 and total_size < 5 * 1024:  # 小于5KB的文件忽略
+            if total_size > 0 and total_size < 5 * 1024:  # 小于 5KB 的文件忽略
                 logging.warning(f"文件 {url} 太小，跳过")
                 return False
             with open(filepath, "wb") as f:
@@ -138,8 +138,17 @@ def download_worker(row, save_dir: str, sources: List[str], filename_pattern: st
     """Download a single DOI's PDF with smart retry based on error type."""
     doi = row['DOI']
     pmid = row['PMID']
+
+    # Skip if no DOI available (Sci-Hub requires DOI)
+    if not doi or (isinstance(doi, float) and pd.isna(doi)) or (isinstance(doi, str) and doi.strip() == ''):
+        logging.warning(f"[SKIP] {pmid} | No DOI available - Sci-Hub requires DOI for download")
+        return False
+
     # Use the specified filename pattern (pmid, doi, or original)
     identifier = pmid if filename_pattern == "pmid" else doi
+    # Fallback to DOI if PMID is missing
+    if filename_pattern == "pmid" and (not identifier or identifier == 'nan'):
+        identifier = doi
     filename = clean_filename(identifier, filename_pattern)
     filepath = os.path.join(save_dir, filename)
 
@@ -234,41 +243,63 @@ def main():
     try:
         df = pd.read_csv(args.csv_file, dtype=str)
     except FileNotFoundError:
-        logging.error(f"CSV 文件不存在: {args.csv_file}")
+        logging.error(f"CSV 文件不存在：{args.csv_file}")
         return
-    
+
     df.columns = df.columns.str.upper()
 
-    if 'PMID' not in df.columns or 'DOI' not in df.columns:
-        logging.error("CSV 文件必须包含 'PMID' 和 'DOI' 列")
+    # --- 验证列：PMID 和 DOI 至少有一列 ---
+    if 'PMID' not in df.columns and 'DOI' not in df.columns:
+        logging.error("CSV 文件必须包含 'PMID' 或 'DOI' 列")
         return
 
-    # --- 清理 DOI 空值 & 去重 DOI ---
-    df = df[df['DOI'].notna() & df['DOI'].str.strip().ne('')]
-    df = df.drop_duplicates(subset='DOI')
-    if df.empty:
-        logging.info("没有可下载的 DOI")
-        return
+    # 初始化缺失的列
+    if 'PMID' not in df.columns:
+        df['PMID'] = None
+    if 'DOI' not in df.columns:
+        df['DOI'] = None
+
+    # --- 清理空值 & 去重 ---
+    # 保留有 PMID 或 DOI 的行
+    has_pmid = df['PMID'].notna() & df['PMID'].str.strip().ne('')
+    has_doi = df['DOI'].notna() & df['DOI'].str.strip().ne('')
+    df = df[has_pmid | has_doi]
+
+    # 去重：优先按 DOI，其次按 PMID
+    if has_doi.any():
+        df = df.drop_duplicates(subset='DOI')
+    elif has_pmid.any():
+        df = df.drop_duplicates(subset='PMID')
 
     # --- 预检查已存在文件 ---
     # Use same pattern as download_worker for consistency
     df_to_download = []
     exists_count = 0
+    no_doi_count = 0  # Count records without DOI
     for _, row in df.iterrows():
+        # Skip records without DOI (cannot download via Sci-Hub)
+        if not row['DOI'] or (isinstance(row['DOI'], str) and row['DOI'].strip() == ''):
+            no_doi_count += 1
+            logging.warning(f"[SKIP] {row['PMID'] or row['DOI']} | No DOI available")
+            continue
+
         # Use same pattern as download_worker
         identifier = row['PMID'] if args.format == "pmid" else row['DOI']
+        # Fallback to DOI if PMID is missing
+        if args.format == "pmid" and (not identifier or identifier == 'nan'):
+            identifier = row['DOI']
         filename = clean_filename(identifier, args.format)
         filepath = os.path.join(args.save_dir, filename)
         if os.path.exists(filepath):
             if not is_pdf_valid(filepath):
-                logging.warning(f"[CORRUPTED] {row['PMID']}")
+                logging.warning(f"[CORRUPTED] {row['PMID'] or row['DOI']}")
                 if args.delete_corrupted:
                     os.remove(filepath)
                     df_to_download.append(row)
                 else:
-                    logging.info(f"[SKIP] {row['PMID']}，损坏文件未删除")
+                    logging.info(f"[SKIP] {row['PMID'] or row['DOI']}，损坏文件未删除")
             else:
-                logging.info(f"[EXISTS] {row['PMID']}")
+                logging.info(f"[EXISTS] {row['PMID'] or row['DOI']}")
                 exists_count += 1
         else:
             df_to_download.append(row)
@@ -276,7 +307,7 @@ def main():
     if not df_to_download:
         logging.info("所有文件已存在且有效，无需下载")
         if args.quiet:
-            print(f"任务完成: 共 {len(df)} 条记录, 全部已存在")
+            print(f"任务完成：共 {len(df)} 条记录，全部已存在")
         return
 
     # --- 并行下载 ---
@@ -287,17 +318,18 @@ def main():
         futures = {executor.submit(download_worker, row, args.save_dir, sources, args.format): row for row in df_to_download}
         for future in tqdm(as_completed(futures), total=len(futures), desc="下载 PDF", ncols=100):
             row = futures[future]
+            display_id = row['PMID'] if row['PMID'] and str(row['PMID']) != 'nan' else row['DOI']
             try:
                 success = future.result()
                 if success:
                     success_count += 1
                     if not args.quiet:
-                        logging.info(f"[SUCCESS] {row['PMID']}")
+                        logging.info(f"[SUCCESS] {display_id}")
                 else:
-                    logging.warning(f"[FAILED] {row['PMID']}")
+                    logging.warning(f"[FAILED] {display_id}")
                     failed_records.append({'PMID': row['PMID'], 'DOI': row['DOI']})
             except Exception as e:
-                logging.error(f"[CRITICAL] {row['PMID']} 下载异常: {e}")
+                logging.error(f"[CRITICAL] {display_id} 下载异常：{e}")
                 failed_records.append({'PMID': row['PMID'], 'DOI': row['DOI']})
 
     # --- 保存失败记录 ---
@@ -311,13 +343,13 @@ def main():
     # --- Quiet mode summary report ---
     if args.quiet:
         total_in_csv = len(df)
-        print(f"任务完成: 共 {total_in_csv} 条记录")
+        print(f"任务完成：共 {total_in_csv} 条记录")
         if exists_count > 0:
-            print(f"  已存在: {exists_count}")
+            print(f"  已存在：{exists_count}")
         if len(df_to_download) > 0:
-            print(f"  新下载: 成功 {success_count}, 失败 {len(failed_records)}")
+            print(f"  新下载：成功 {success_count}, 失败 {len(failed_records)}")
         if failed_records:
-            print(f"  失败记录已保存到: {args.failed_csv or os.path.join(args.save_dir, 'failed_records.csv')}")
+            print(f"  失败记录已保存到：{args.failed_csv or os.path.join(args.save_dir, 'failed_records.csv')}")
 
 if __name__ == "__main__":
     main()

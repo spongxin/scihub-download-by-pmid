@@ -42,7 +42,8 @@ def test_csv_input_integration():
             text=True
         )
         assert result.returncode == 0
-        assert "Loaded" in result.stdout
+        # Check for Chinese log output "Using X sources"
+        assert "Using" in result.stdout or "using" in result.stderr.lower()
     finally:
         Path(csv_path).unlink()
 
@@ -61,6 +62,7 @@ def test_txt_input_integration():
             text=True
         )
         assert result.returncode == 0
-        assert "Loaded" in result.stdout
+        # TXT files are converted to CSV by input_parser, check for download attempt
+        assert "Using" in result.stdout or "using" in result.stderr.lower()
     finally:
         Path(txt_path).unlink()

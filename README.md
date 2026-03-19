@@ -4,6 +4,9 @@
 
 ## 功能特性
 
+- **灵活的输入格式**：支持 CSV、TXT、XLSX 文件，自动识别 PMID/DOI 列
+- **智能列识别**：支持小写列名 (pmid/doi)，自动识别只有 PMID 或只有 DOI 的文件
+- **自动 ID 识别**：TXT 文件中自动区分 PMID（数字）和 DOI（含"/"）
 - **多格式输入**：支持 CSV、TXT、XLSX 文件和单个 PMID/DOI
 - **智能源管理**：自动发现、测试和排序可用的 Sci-Hub 镜像源
 - **错误分类**：自动识别 404、网络错误、验证失败并采取不同策略
@@ -170,24 +173,49 @@ python -m scihub_download --file papers.csv
 
 ### CSV 文件
 
-第一行必须是表头，支持以下列名：
-- `PMID` 或 `pmid`
-- `DOI` 或 `doi`
+第一行必须是表头，支持以下列名（大小写均可）：
+- `PMID`、`pmid`
+- `DOI`、`doi`
 
+**完整格式（PMID 和 DOI 都有）：**
 ```csv
 PMID,DOI
 12345678,10.1234/example
-87654321,
+87654321,10.5678/test
+```
+
+**只有 PMID 列：**
+```csv
+pmid
+12345678
+87654321
+```
+
+**只有 DOI 列：**
+```csv
+doi
+10.1234/example
+10.5678/test
+```
+
+**PMID 和 DOI 混合（自动识别）：**
+```csv
+id
+12345678
+10.1234/example
 ```
 
 ### TXT 文件
 
-每行一个 ID，可以是 PMID 或 DOI：
+每行一个 ID，自动识别 PMID 和 DOI：
+- **PMID**: 纯数字
+- **DOI**: 包含 "/" 字符
+
 ```
 12345678
 10.1234/example/doi
-PMID:87654321
-DOI:10.5678/test
+87654321
+10.5678/test
 ```
 
 ### Excel 文件
