@@ -24,7 +24,13 @@
 3. User can provide input via TXT file with one ID per line
 4. User can provide input via Excel file (.xlsx)
 5. User can specify a single PMID/DOI via command line argument
-**Plans:** TBD
+**Plans:** 4 plans in 3 waves
+
+Plans:
+- [ ] 01-PLAN-00.md - Test infrastructure setup (pytest, fixtures, test stubs)
+- [ ] 01-PLAN-01.md - Input parser module (CSV, TXT, Excel, single ID)
+- [ ] 01-PLAN-02.md - CLI argument parser (all flags CLI-01 to CLI-06)
+- [ ] 01-PLAN-03.md - Integration and entry point
 
 ### Phase 2: Source Management
 **Goal:** System reliably discovers and manages working SciHub sources
@@ -73,7 +79,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/1 | Not started | - |
+| 1. Foundation | 0/4 | Planning complete | - |
 | 2. Source Management | 0/1 | Not started | - |
 | 3. Download Engine | 0/1 | Not started | - |
 | 4. File Output | 0/1 | Not started | - |
@@ -94,3 +100,4 @@
 
 ---
 *Roadmap created: 2026-03-19*
+*Phase 1 planned: 2026-03-19*
