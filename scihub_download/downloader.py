@@ -145,11 +145,13 @@ def download_file(url: str, filepath: str) -> bool:
         return False
 
 # ------------------- 下载 Worker -------------------
-def download_worker(row, save_dir: str, sources: List[str]) -> bool:
+def download_worker(row, save_dir: str, sources: List[str], filename_pattern: str = "pmid") -> bool:
     """Download a single DOI's PDF with smart retry based on error type."""
     doi = row['DOI']
     pmid = row['PMID']
-    filename = clean_filename(pmid)
+    # Use the specified filename pattern (pmid, doi, or original)
+    identifier = pmid if filename_pattern == "pmid" else doi
+    filename = clean_filename(identifier, filename_pattern)
     filepath = os.path.join(save_dir, filename)
 
     for source_url in sources:
@@ -189,6 +191,8 @@ def main():
     parser.add_argument("--no-auto-sources", action='store_true', help="禁用自动源获取，使用默认源")
     parser.add_argument("--refresh-sources", action='store_true', help="强制刷新源缓存")
     parser.add_argument("--delete-corrupted", action='store_true', help="删除损坏文件后重下载")
+    parser.add_argument("--format", type=str, choices=["pmid", "doi", "original"],
+                        default="pmid", help="Filename pattern (default: pmid)")
     parser.add_argument("-l", "--log_file", default="download_log.txt", help="日志文件")
     args = parser.parse_args()
 
@@ -251,7 +255,7 @@ def main():
     # --- 并行下载 ---
     failed_records = []
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        futures = {executor.submit(download_worker, row, args.save_dir, sources): row for row in df_to_download}
+        futures = {executor.submit(download_worker, row, args.save_dir, sources, args.format): row for row in df_to_download}
         for future in tqdm(as_completed(futures), total=len(futures), desc="下载 PDF", ncols=100):
             row = futures[future]
             try:

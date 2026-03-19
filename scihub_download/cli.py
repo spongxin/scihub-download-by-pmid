@@ -1,8 +1,10 @@
 """CLI argument parser for scihub-download."""
 import argparse
+import sys
 from typing import Optional, List
 
 from .input_parser import parse_input_file, parse_single_id
+from .downloader import main as downloader_main
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -47,20 +49,28 @@ def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
 
-    # Parse input
+    # Parse input - convert to CSV for downloader
     if args.file:
-        df = parse_input_file(args.file)
-        print(f"Loaded {len(df)} records from {args.file}")
-    else:  # args.id
+        csv_file = args.file
+        print(f"Loaded {args.file}")
+    else:  # args.id - create temp CSV
+        import pandas as pd
+        import tempfile
         df = parse_single_id(args.id)
+        # Create temporary CSV for downloader
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+        df.to_csv(temp_file.name, index=False)
+        csv_file = temp_file.name
         print(f"Processing single ID: {args.id}")
 
-    # Print configuration summary
-    print(f"Output directory: {args.output}")
-    print(f"Workers: {args.workers}")
-    print(f"Format: {args.format}")
-    print(f"Verbose: {args.verbose}")
-    print(f"Quiet: {args.quiet}")
+    # Build argument list for downloader
+    downloader_args = ['', csv_file, args.output,
+                       '--workers', str(args.workers),
+                       '--format', args.format,
+                       '--delete-corrupted']
+    if args.verbose:
+        downloader_args.append('--verbose')
 
-    # Placeholder for Phase 3 download logic
-    print(f"\nFound {len(df)} records to process.")
+    # Call downloader main with modified argv
+    sys.argv = downloader_args
+    downloader_main()
